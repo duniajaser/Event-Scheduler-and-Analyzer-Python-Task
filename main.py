@@ -58,19 +58,43 @@ def main():
     load_events()
 
     # Event management operations
-    if getattr(args, 'add_event', None):
-        # Check if all required fields are provided
-        if not all([args.category, args.start_time, args.duration]):
-            missing_args = [arg for arg, value in [('category', args.category), ('start-time', args.start_time), ('duration', args.duration)] if not value]
+    if args.add:
+        # Check if all required fields for adding an event are provided
+        if not all([args.name, args.category, args.start_time, args.duration]):
+            missing_args = [arg for arg, value in [('name', args.name), ('category', args.category), ('start-time', args.start_time), ('duration', args.duration)] if not value]
             print(f"Missing argument(s) for adding an event: {', '.join(missing_args)}")
             sys.exit(1)
         # If all required arguments are provided, attempt to add the event
-        success = add_event(args.add_event, args.category, args.start_time, args.duration)
+        success = add_event(args.name, args.category, args.start_time, args.duration)
         if not success:
             print("Failed to add the event. Check details and try again.")
-            sys.exit(1)  # Exit if adding the event fails
+            sys.exit(1)
 
-    if getattr(args, 'free_times', None):
+    if args.update:
+        # Check if all required fields for updating are referenced
+        if not args.start_time:
+            print("Missing start-time for the update.")
+            sys.exit(1)
+        # Attempt to update the event
+        success = update_event(args.start_time, args.name, args.category, args.duration)
+        if not success:
+            print("Failed to update the event. Check details and try again.")
+            sys.exit(1)
+
+    if args.delete:
+        delete_event(args.delete)
+
+    # Event viewing and analytics
+    if args.view_events:
+        view_events()
+
+    if args.report:
+        generate_report()
+
+    if args.filter_category:
+        filter_events_by_category(args.filter_category)
+
+    if args.free_times:
         try:
             specified_date = validate_date(args.free_times)  
             free_times = find_free_times(specified_date)
@@ -82,24 +106,8 @@ def main():
         except ValueError:
             print("Invalid date format. Please use YYYY-MM-DD format.")
 
-
-    if getattr(args, 'update_event', None):
-        update_event(args.update_event, args.category, args.start_time, args.duration)
-
-    if getattr(args, 'delete_event', None):
-        delete_event(args.delete_event)
-
-    # Event viewing and analytics
-    if getattr(args, 'view_events', False):
-        view_events()
-
-    if getattr(args, 'report', False):
-        generate_report()
-
-    if getattr(args, 'filter_category', None):
-        filter_events_by_category(args.filter_category)
-        
     sys.exit(0)
+
 
 #--------------------------------------------------------------------------------------------------------------------------
 
@@ -108,24 +116,24 @@ def help_maker():
         description="Event Scheduler and Analyzer",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument('-a', '--add-event', type=str, metavar='<EVENT_NAME>', 
-                        help='Add a new event. Requires --category, --start-time, and --duration.')
-    parser.add_argument('-u', '--update-event', type=str, metavar='<EVENT_NAME>',
-                        help='Update an existing event. Requires --category, --start-time, and --duration.')
-    parser.add_argument('-d', '--delete-event', type=str, metavar='<START_TIME>',
-                        help='Delete an event. Requires specifying the start time of the event in "YYYY-MM-DD HH:MM" format.')
+    
+    # General flags for event manipulation
+    parser.add_argument('-n', '--name', type=str, help='Name of the event.')
+    parser.add_argument('-c', '--category', type=str, choices=['Work', 'Exercise', 'Leisure'], help='Category of the event.')
+    parser.add_argument('-s', '--start-time', type=str, help='Start time of the event in "YYYY-MM-DD HH:MM" format for adding or reference for update.')
+    parser.add_argument('-t', '--duration', type=int, help='Duration of the event in minutes.')
+
+    # Specific actions
+    parser.add_argument('-a', '--add', action='store_true', help='Flag to add a new event. Requires --name, --category, --start-time, and --duration.')
+    parser.add_argument('-u', '--update', action='store_true', help='Flag to update an existing event. Use --start-time to specify the event to update.')
+    parser.add_argument('-d', '--delete', type=str, metavar='<START_TIME>', help='Delete an event. Requires specifying the start time of the event in "YYYY-MM-DD HH:MM" format.')
     parser.add_argument('-v', '--view-events', action='store_true', help='Display all events.')
     parser.add_argument('-r', '--report', action='store_true', help='Generate a report of all events.')
-
-    # Event specifics
-    parser.add_argument('-c', '--category', type=str, choices=['Work', 'Exercise', 'Leisure'], help='Category of the event.')
-    parser.add_argument('-s', '--start-time', type=str, help='Start time of the event in "YYYY-MM-DD HH:MM" format.')
-    parser.add_argument('-t', '--duration', type=int, help='Duration of the event in minutes.')
     parser.add_argument('-f', '--free-times', type=str, metavar='<DATE>', help='Check free times for a specified date in "YYYY-MM-DD HH:MM" format.')
-    parser.add_argument('-fc' ,'--filter-category', type=str, choices=['Work', 'Exercise', 'Leisure'],
-                        help='Filter events by category.')
-    
+    parser.add_argument('-fc', '--filter-category', type=str, choices=['Work', 'Exercise', 'Leisure'], help='Filter events by category.')
+
     return parser, parser.parse_args()
+
 
 #--------------------------------------------------------------------------------------------------------------------------
 
@@ -169,8 +177,33 @@ def add_event(name, category, start_time, duration):
 
 #--------------------------------------------------------------------------------------------------------------------------
 
-def update_event(name, category, start_time, duration):
-    print(f"Updating event: {name}, Category: {category}, Starts at: {start_time}, Duration: {duration} minutes")
+def update_event(original_start_time, new_name=None, new_category=None, new_duration=None):
+    try:
+        # Convert the original start time to a datetime object
+        event_datetime = validate_date(original_start_time)
+    except ValueError as e:
+        print(f"Error: {str(e)}")
+        return False
+
+    if event_datetime not in events:
+        print(f"No event found at {original_start_time}.")
+        return False
+
+    current_event = events[event_datetime]
+    updated_name = new_name if new_name else current_event[0]
+    updated_category = new_category.lower() if new_category else current_event[1]
+    updated_duration = new_duration if new_duration else current_event[2]
+
+    # If the duration is being changed, check for conflicts before updating
+    if new_duration and is_time_conflict(event_datetime, new_duration):
+        print("Failed to update due to a time conflict with another event.")
+        return False
+
+    # Update the event in the dictionary
+    events[event_datetime] = (updated_name, updated_category, updated_duration)
+    print(f"Event updated: {updated_name}, Category: {updated_category}, Duration: {updated_duration} minutes")
+    save_events()
+    return True
 
 #--------------------------------------------------------------------------------------------------------------------------
 
