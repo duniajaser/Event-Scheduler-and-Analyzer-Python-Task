@@ -71,12 +71,19 @@ def main():
             sys.exit(1)
 
     if args.update:
-        # Check if all required fields for updating are referenced
         if not args.start_time:
-            print("Missing start-time for the update.")
+            print("Please specify the start time of the event to update using '--start-time'.")
             sys.exit(1)
-        # Attempt to update the event
-        success = update_event(args.start_time, args.name, args.category, args.duration)
+        if not any([args.name, args.category, args.duration]):
+            print("No update information provided. Specify at least one of --name, --category, or --duration.")
+            sys.exit(1)
+            
+        success = update_event(
+            args.start_time, 
+            new_name=args.name if args.name else None, 
+            new_category=args.category if args.category else None, 
+            new_duration=args.duration if args.duration else None
+        )
         if not success:
             print("Failed to update the event. Check details and try again.")
             sys.exit(1)
