@@ -32,17 +32,15 @@ def validate_date(date_str, test_time=1):
 
 
 def load_events():
-    """Generator to load events from a JSON file one at a time."""
     try:
         with open('events.json', 'r') as file:
             loaded_events = json.load(file)
+            events.clear()
             for k, v in loaded_events.items():
                 start_datetime = datetime.strptime(k, '%Y-%m-%d %H:%M')
-                event_details = (v['name'], v['category'], v['duration'])
-                yield start_datetime, event_details
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error loading events: {e}")
-        return
+                events[start_datetime] = (v['name'], v['category'], v['duration'])
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # Handle errors or initialize an empty events dictionary
 
 #--------------------------------------------------------------------------------------------------------------------------
 
@@ -59,8 +57,7 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    for start_datetime, event_details in load_events():
-        events[start_datetime] = event_details
+    load_events()
 
     # Event management operations
     if args.add:
