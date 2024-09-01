@@ -32,15 +32,17 @@ def validate_date(date_str, test_time=1):
 
 
 def load_events():
+    """Generator to load events from a JSON file one at a time."""
     try:
         with open('events.json', 'r') as file:
             loaded_events = json.load(file)
-            events.clear()
             for k, v in loaded_events.items():
                 start_datetime = datetime.strptime(k, '%Y-%m-%d %H:%M')
-                events[start_datetime] = (v['name'], v['category'], v['duration'])
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass  # Handle errors or initialize an empty events dictionary
+                event_details = (v['name'], v['category'], v['duration'])
+                yield start_datetime, event_details
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading events: {e}")
+        return
 
 #--------------------------------------------------------------------------------------------------------------------------
 
@@ -57,7 +59,8 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    load_events()
+    for start_datetime, event_details in load_events():
+        events[start_datetime] = event_details
 
     # Event management operations
     if args.add:
@@ -241,11 +244,11 @@ def view_events():
         print("No scheduled events.")
         return
     print("Viewing all scheduled events:")
-    print(f"{'Start Time':<20} {'Name':<25} {'Category':<15} {'Duration (min)':<15}")
+    print(f"{'Start Time':<20} {'Name':<30} {'Category':<15} {'Duration (min)':<15}")
     print("-" * 75)
     for start_time, (name, category, duration) in sorted(events.items()):
         start_str = start_time.strftime('%Y-%m-%d %H:%M')
-        print(f"{start_str:<20} {name:<25} {category:<15} {duration:<15d}")
+        print(f"{start_str:<20} {name:<30} {category:<15} {duration:<15d}")
 
 #--------------------------------------------------------------------------------------------------------------------------
 
@@ -373,11 +376,11 @@ def filter_events_by_category(category):
         print(f"No events found in category '{category}'.")
     else:
         print(f"Events in category '{category}':")
-        print(f"{'Start Time':<20} {'Name':<25} {'Category':<15} {'Duration (min)':<15}")
+        print(f"{'Start Time':<20} {'Name':<30} {'Category':<15} {'Duration (min)':<15}")
         print("-" * 75)
         for start_time, (name, cat, duration) in sorted(filtered_events.items()):
             start_str = start_time.strftime('%Y-%m-%d %H:%M')
-            print(f"{start_str:<20} {name:<25} {cat:<15} {duration:<15d}")
+            print(f"{start_str:<20} {name:<30} {cat:<15} {duration:<15d}")
 
 #--------------------------------------------------------------------------------------------------------------------------
 
