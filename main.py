@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 from datetime import datetime, timedelta
+from collections import defaultdict
+import texttable as tt  # A simple library to draw text tables
 import argparse
 import sys
 import json
@@ -247,8 +249,102 @@ def view_events():
 
 #--------------------------------------------------------------------------------------------------------------------------
 
+def generate_day_durations():
+    day_durations = {}
+    for start, details in events.items():
+        day = start.date()
+        day_durations[day] = day_durations.get(day, 0) + details[2]
+        yield day, day_durations[day]
+
+def busiest_days():
+    day_durations = {}
+    for day, duration in generate_day_durations():
+        day_durations[day] = duration
+    busiest = sorted(day_durations.items(), key=lambda x: x[1], reverse=True)
+    return busiest
+
+def trend_generator():
+    weekly_durations = defaultdict(lambda: defaultdict(int))  # Nested defaultdict to track categories
+    for start, details in events.items():
+        week = start.strftime('%Y-%U')  # Year and week number
+        category = details[1].lower()
+        weekly_durations[week][category] += details[2]
+        yield week, weekly_durations[week]
+
+def trends_over_time():
+    trends = defaultdict(dict)
+    for week, durations in trend_generator():
+        total_duration = sum(durations.values())
+        max_category = max(durations, key=durations.get)  # Find the category with the highest duration
+        trends[week] = {
+            "total_duration": total_duration,
+            "max_category": max_category.capitalize(),
+            "max_category_duration": durations[max_category]
+        }
+    weeks_sorted = sorted(trends.items())
+    return weeks_sorted
+
+def total_time_per_category():
+    category_times = {}
+    for category in ['work', 'exercise', 'leisure']:  # Ensure all categories are accounted for
+        total_time = sum(details[2] for start, details in events.items() if details[1].lower() == category)
+        category_times[category.capitalize()] = total_time
+    return category_times
+
+
 def generate_report():
-    print("Generating event report.")
+    print("\nGenerating comprehensive event report...")
+    with open('report_log.log', 'w') as log_file:
+        # Report: Total Time Spent Per Category
+        print("\nTotal Time Spent Per Category:", file=log_file)
+        category_times = total_time_per_category()
+        tab = tt.Texttable()
+        headings = ['Category', 'Total Time (minutes)']
+        tab.header(headings)
+        tab.set_cols_width([10, 20])  # Adjust column widths as necessary
+        for category, time in category_times.items():
+            tab.add_row([category, time])
+        print(tab.draw(), file=log_file)
+
+        # Report: Busiest Days
+        print("\nBusiest Days (most active first):", file=log_file)
+        busiest_days_list = busiest_days()
+        tab = tt.Texttable()
+        headings = ['Date', 'Total Time (minutes)']
+        tab.header(headings)
+        tab.set_cols_width([20, 20])  # Increase width to prevent wrapping
+        if busiest_days_list:
+            for day, duration in busiest_days_list:
+                tab.add_row([day.strftime('%A, %B %d, %Y'), duration])
+        else:
+            print("No events to report.", file=log_file)
+        print(tab.draw(), file=log_file)
+
+        # Report: Trends Over Time
+        tab = tt.Texttable()
+        print("\nTrends Over Time (weekly):", file=log_file)
+        trend_data = trends_over_time()
+        headings = ['Week Starting', 'Total Time (minutes)', 'Max Category', 'Max Category Time (minutes)']
+        tab.header(headings)
+        tab.set_cols_width([20, 20, 15, 25])  # Set column widths
+    
+        if trend_data:
+            for week, data in trend_data:
+                start_date = datetime.strptime(week + '-1', "%Y-%U-%w").strftime('%B %d, %Y')
+                tab.add_row([
+                    start_date,
+                    data['total_duration'],
+                    data['max_category'],
+                    data['max_category_duration']
+                ])
+        else:
+            print("No sufficient data for trend analysis.")
+        print(tab.draw(), file=log_file)
+
+
+    with open('report_log.log', 'r') as log_file:
+        print(log_file.read())
+
 
 #--------------------------------------------------------------------------------------------------------------------------
 def find_free_times(date):
