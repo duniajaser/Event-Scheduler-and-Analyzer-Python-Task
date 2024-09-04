@@ -20,12 +20,12 @@ def validate_date(date_str, test_time=1):
             # If initial parsing fails, assume only the date is provided and append "00:00" for start of the day
             date_time = datetime.strptime(date_str + " 00:00", "%Y-%m-%d %H:%M")
         except ValueError:
-            print(f"Error: Invalid date format. Please use 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM'. Provided date: {date_str}")
-            sys.exit(1)
+            raise ValueError(f"Invalid date format. Please use 'YYYY-MM-DD HH:MM'. Provided date: {date_str}")
+
     if test_time == 1:
         if date_time <= datetime.now():
-            print(f"Error: The date '{date_str}' must be in the future.")
-            sys.exit(1)
+            raise ValueError(f"The date '{date_str}' must be in the future.")
+
     return date_time
 
 #--------------------------------------------------------------------------------------------------------------------------
